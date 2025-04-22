@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Créateur de Poules de Combattants - Drag & Drop + Tri</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f6f8;
+        margin: 20px;
+        color: #333;
+      }
+      h1 {
+        text-align: center;
+        color: #2c3e50;
+      }
+      input,
+      button {
+        padding: 10px;
+        font-size: 16px;
+        margin: 5px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+      }
+      button {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #2980b9;
+      }
+      table {
+        width: 100%;
+        margin: 20px 0;
+        border-collapse: collapse;
+        background-color: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        overflow: hidden;
+        table-layout: fixed;
+      }
+      caption {
+        background-color: #3498db;
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        padding: 10px;
+      }
+      th,
+      td {
+        padding: 12px;
+        text-align: center;
+        border: 1px solid #ddd;
+        word-wrap: break-word;
+      }
+      thead {
+        background-color: #2980b9;
+        color: white;
+      }
+      thead th {
+        width: 12.5%;
+      }
+      tbody tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      tbody tr:hover {
+        background-color: #d6eaf8;
+      }
+      tbody.drag-over {
+        background-color: #e1f5fe !important;
+      }
+      .empty-dropzone {
+        color: #aaa;
+        font-style: italic;
+        height: 50px;
+      }
+      #controls {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Créateur de Poules de Combattants - Drag & Drop + Tri</h1>
+
+    <div id="controls">
+      <input type="file" id="csvFile" accept=".csv" />
+      <br /><br />
+      Taille maximale par poule :
+      <input type="number" id="maxPouleSize" value="5" min="1" />
+      <br /><br />
+      <button onclick="startProcessing()">Générer les Poules</button>
+    </div>
+
+    <div id="generateTestCSV" style="text-align: center">
+      <h2>Générer un fichier CSV de Test</h2>
+      Nombre de combattants :
+      <input
+        type="number"
+        id="nbCombattantsTest"
+        value="300"
+        min="1"
+        style="width: 80px; margin: 5px"
+      />
+      <br /><br />
+      <button onclick="genererCombattantsCSV()">Générer le CSV</button>
+    </div>
+
+    <div id="poulesResult"></div>
+
+    <script>
+      // === Variables ===
+      const ordreCeintures = [
+        "Blanche",
+        "Jaune",
+        "Orange",
+        "Verte",
+        "Bleue",
+        "Marron",
+        "Noire",
+      ];
+      let draggedRow = null;
+
+      // === Fonctions principales ===
+
+      function comparerCeintures(a, b) {
+        return ordreCeintures.indexOf(a) - ordreCeintures.indexOf(b);
+      }
+
+      function categorieAge(age, sexe) {
+        if (age >= 4 && age <= 5) return "Eveils";
+        if (age >= 6 && age <= 7) return "Poussinets";
+        if (age >= 8 && age <= 9) return "Poussins";
+        if (age >= 10 && age <= 11)
+          return sexe === "F" ? "Benjamines" : "Benjamins";
+        if (age >= 12 && age <= 13) return "Minimes";
+        if (age >= 14 && age <= 16) return "Cadets";
+        if (age >= 17 && age <= 19) return "Juniors";
+        if (age >= 20) return "Seniors";
+        return "Inconnu";
+      }
+
+      function categoriePoids(sexe, age, poids) {
+        const categorie = categorieAge(age, sexe);
+        if (["Eveils", "Poussinets", "Poussins"].includes(categorie))
+          return "Non défini";
+
+        const poidsMasculin = {
+          Benjamins: [30, 34, 38, 42, 46, 50, 55, 60, 66, 73],
+          Minimes: [34, 38, 42, 46, 50, 55, 60, 66, 73],
+          Cadets: [46, 50, 55, 60, 66, 73, 81, 90, 100],
+          Juniors: [55, 60, 66, 73, 81, 90, 100],
+          Seniors: [60, 66, 73, 81, 90, 100],
+        };
+
+        const poidsFeminin = {
+          Benjamines: [32, 36, 40, 44, 48, 52, 57, 63],
+          Minimes: [36, 40, 44, 48, 52, 57, 63, 70],
+          Cadettes: [40, 44, 48, 52, 57, 63, 70],
+          Juniors: [44, 48, 52, 57, 63, 70, 78],
+          Seniors: [48, 52, 57, 63, 70, 78],
+        };
+
+        const tableauPoids = sexe === "M" ? poidsMasculin : poidsFeminin;
+        const limites = tableauPoids[categorie];
+        if (!limites) return "Non défini";
+
+        for (let i = 0; i < limites.length; i++) {
+          if (poids <= limites[i]) {
+            return `-${limites[i]} kg`;
+          }
+        }
+        return `+${limites[limites.length - 1]} kg`;
+      }
+
+      function iconeCeinture(couleur) {
+        switch (couleur.toLowerCase()) {
+          case "blanche":
+            return "⚪ Blanche";
+          case "jaune":
+            return "🟡 Jaune";
+          case "orange":
+            return "🟠 Orange";
+          case "verte":
+            return "🟢 Verte";
+          case "bleue":
+            return "🔵 Bleue";
+          case "marron":
+            return "🟤 Marron";
+          case "noire":
+            return "⚫ Noire";
+          default:
+            return couleur;
+        }
+      }
+
+      function groupBy(array, keyGetter) {
+        const map = new Map();
+        array.forEach((item) => {
+          const key = keyGetter(item);
+          const collection = map.get(key);
+          if (!collection) {
+            map.set(key, [item]);
+          } else {
+            collection.push(item);
+          }
+        });
+        return map;
+      }
+
+      function startProcessing() {
+        const fileInput = document.getElementById("csvFile");
+        const maxSize = parseInt(document.getElementById("maxPouleSize").value);
+
+        if (!fileInput.files.length) {
+          alert("Veuillez charger un fichier CSV !");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const text = e.target.result;
+          const combattants = parseCSV(text);
+          genererPoules(combattants, maxSize);
+        };
+        reader.readAsText(fileInput.files[0]);
+      }
+
+      function parseCSV(data) {
+        const rows = data.trim().split("\n");
+        const parsed = [];
+
+        for (let i = 1; i < rows.length; i++) {
+          const cols = rows[i].split(",");
+          if (cols.length < 6) continue;
+          parsed.push({
+            nom: cols[0].trim(),
+            prenom: cols[1].trim(),
+            sexe: cols[2].trim().toUpperCase(),
+            age: parseInt(cols[3].trim()),
+            ceinture: capitalize(cols[4].trim()),
+            poids: parseFloat(cols[5].trim()),
+          });
+        }
+        return parsed;
+      }
+
+      function capitalize(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+      }
+
+      function genererPoules(combattants, maxSize) {
+        let poules = [];
+
+        combattants.forEach((c) => {
+          c.catAge = categorieAge(c.age, c.sexe);
+          c.catPoids = categoriePoids(c.sexe, c.age, c.poids);
+        });
+
+        const groupes = groupBy(
+          combattants,
+          (c) => `${c.sexe}-${c.catAge}-${c.ceinture}-${c.catPoids}`
+        );
+
+        groupes.forEach((liste) => {
+          liste.sort((a, b) => a.poids - b.poids);
+
+          let currentPoule = [];
+          liste.forEach((c) => {
+            currentPoule.push(c);
+            if (currentPoule.length === maxSize) {
+              poules.push(currentPoule);
+              currentPoule = [];
+            }
+          });
+          if (currentPoule.length > 0) poules.push(currentPoule);
+        });
+
+        poules.sort((a, b) => {
+          const firstA = a[0];
+          const firstB = b[0];
+
+          if (firstA.sexe !== firstB.sexe) {
+            return firstA.sexe.localeCompare(firstB.sexe);
+          }
+          const ordreAge = [
+            "Eveils",
+            "Poussinets",
+            "Poussins",
+            "Benjamins",
+            "Benjamines",
+            "Minimes",
+            "Cadets",
+            "Cadettes",
+            "Juniors",
+            "Seniors",
+          ];
+          const idxAgeA = ordreAge.indexOf(firstA.catAge);
+          const idxAgeB = ordreAge.indexOf(firstB.catAge);
+          if (idxAgeA !== idxAgeB) {
+            return idxAgeA - idxAgeB;
+          }
+          const idxCeintureA = ordreCeintures.indexOf(firstA.ceinture);
+          const idxCeintureB = ordreCeintures.indexOf(firstB.ceinture);
+          if (idxCeintureA !== idxCeintureB) {
+            return idxCeintureA - idxCeintureB;
+          }
+          const poidsA = parseInt(firstA.catPoids.replace(/\D/g, "")) || 999;
+          const poidsB = parseInt(firstB.catPoids.replace(/\D/g, "")) || 999;
+          return poidsA - poidsB;
+        });
+
+        afficherPoules(poules);
+      }
+
+      function afficherPoules(poules) {
+        const container = document.getElementById("poulesResult");
+        container.innerHTML = "";
+
+        poules.forEach((poule, index) => {
+          const table = document.createElement("table");
+          const first = poule[0];
+          const sexe = first.sexe === "M" ? "Hommes" : "Femmes";
+
+          const caption = document.createElement("caption");
+          caption.innerText = `Poule ${index + 1} - ${sexe} - ${
+            first.catAge
+          } - Ceinture ${first.ceinture} - ${first.catPoids} (${
+            poule.length
+          } combattants)`;
+          caption.style.backgroundColor =
+            first.sexe === "M" ? "#3498db" : "#9b59b6";
+          table.appendChild(caption);
+
+          const thead = document.createElement("thead");
+          thead.innerHTML = `
+      <tr>
+        <th>Nom</th>
+        <th>Prénom</th>
+        <th>Sexe</th>
+        <th>Âge</th>
+        <th>Catégorie</th>
+        <th>Ceinture</th>
+        <th>Poids</th>
+        <th>Catégorie Poids</th>
+      </tr>
+    `;
+          table.appendChild(thead);
+
+          const tbody = document.createElement("tbody");
+          tbody.ondragover = allowDrop;
+          tbody.ondrop = drop;
+          tbody.ondragenter = dragEnter;
+          tbody.ondragleave = dragLeave;
+
+          poule.forEach((c) => {
+            const tr = document.createElement("tr");
+            tr.setAttribute("draggable", "true");
+            tr.ondragstart = dragStart;
+            tr.innerHTML = `
+        <td>${c.nom}</td>
+        <td>${c.prenom}</td>
+        <td>${c.sexe}</td>
+        <td>${c.age}</td>
+        <td>${c.catAge}</td>
+        <td>${iconeCeinture(c.ceinture)}</td>
+        <td>${c.poids} kg</td>
+        <td>${c.catPoids}</td>
+      `;
+            tbody.appendChild(tr);
+          });
+
+          table.appendChild(tbody);
+          container.appendChild(table);
+        });
+      }
+
+      // Drag & Drop events
+      function dragStart(event) {
+        draggedRow = event.target;
+        event.dataTransfer.effectAllowed = "move";
+      }
+
+      function allowDrop(event) {
+        event.preventDefault();
+      }
+
+      function dragEnter(event) {
+        if (event.target.closest("tbody")) {
+          event.target.closest("tbody").classList.add("drag-over");
+        }
+      }
+
+      function dragLeave(event) {
+        if (event.target.closest("tbody")) {
+          event.target.closest("tbody").classList.remove("drag-over");
+        }
+      }
+
+      function drop(event) {
+        event.preventDefault();
+        const tbody = event.target.closest("tbody");
+        if (draggedRow && tbody) {
+          tbody.classList.remove("drag-over");
+
+          const oldTbody = draggedRow.parentElement;
+          tbody.appendChild(draggedRow);
+
+          // Si ancienne poule vide ➔ ajouter message
+          if (oldTbody && oldTbody.children.length === 0) {
+            const empty = document.createElement("tr");
+            empty.classList.add("empty-dropzone");
+            empty.innerHTML = `<td colspan="8">(Déposez un combattant ici)</td>`;
+            oldTbody.appendChild(empty);
+          }
+
+          // Si nouvelle poule avait un message vide ➔ l’enlever
+          const emptyRow = tbody.querySelector(".empty-dropzone");
+          if (emptyRow) {
+            emptyRow.remove();
+          }
+        }
+      }
+    </script>
+  </body>
+</html>
