@@ -2,7 +2,7 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <title>Créateur de Poules de Combattants - Drag & Drop + Tri</title>
+    <title>Créateur de Poules de Combattants - Export PDF</title>
     <style>
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -81,10 +81,14 @@
         margin-bottom: 30px;
       }
     </style>
+
+    <!-- 📎 jsPDF & autoTable (CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   </head>
 
   <body>
-    <h1>Créateur de Poules de Combattants - Drag & Drop + Tri</h1>
+    <h1>Créateur de Poules de Combattants - Export PDF</h1>
 
     <div id="controls">
       <input type="file" id="csvFile" accept=".csv" />
@@ -93,6 +97,7 @@
       <input type="number" id="maxPouleSize" value="5" min="1" />
       <br /><br />
       <button onclick="startProcessing()">Générer les Poules</button>
+      <button onclick="exporterPDF()">Exporter les Poules en PDF</button>
     </div>
 
     <div id="generateTestCSV" style="text-align: center">
@@ -423,6 +428,56 @@
             emptyRow.remove();
           }
         }
+      }
+      async function exporterPDF() {
+        const doc = new jspdf.jsPDF();
+        const tables = document.querySelectorAll("#poulesResult table");
+
+        for (let t = 0; t < tables.length; t++) {
+          const table = tables[t];
+          const caption =
+            table.querySelector("caption")?.innerText || `Poule ${t + 1}`;
+          const rows = Array.from(table.querySelectorAll("tbody tr"));
+
+          // Obtenir les noms
+          const noms = rows.map((row) => {
+            const cells = row.querySelectorAll("td");
+            return cells[0]?.innerText + " " + cells[1]?.innerText;
+          });
+
+          // Construire la grille tous contre tous
+          const head = ["Nom"].concat(noms).concat("Total");
+          const body = noms.map((nomLigne, i) => {
+            const row = [nomLigne];
+            for (let j = 0; j < noms.length; j++) {
+              row.push(i === j ? "X" : "");
+            }
+            row.push("");
+            return row;
+          });
+
+          if (t > 0) doc.addPage();
+
+          doc.setFontSize(12);
+          doc.text(caption, 14, 20);
+
+          doc.autoTable({
+            head: [head],
+            body: body,
+            startY: 25,
+            styles: { halign: "center", valign: "middle" },
+            headStyles: {
+              fillColor: [52, 152, 219],
+              textColor: 255,
+              fontStyle: "bold",
+            },
+            columnStyles: {
+              0: { halign: "left", cellWidth: "auto" },
+            },
+          });
+        }
+
+        doc.save("fiches-poules.pdf");
       }
     </script>
   </body>
