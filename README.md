@@ -13,6 +13,7 @@ Générateur dynamique de poules pour des compétitions sportives (judo, karaté
 - ⚖️ Répartition équilibrée des poules avec une taille maximale paramétrable
 - 🔱 **Drag & Drop** des combattants entre poules pour réorganiser manuellement
 - 🖙 Mise à jour dynamique des poules après déplacement
+- 📄 Export PDF avec fiche de poule tous contre tous (scores + total)
 - 🖰 Option de génération de fichier CSV de test (combatants fictifs)
 - 🎨 Affichage moderne et responsive
 
@@ -22,7 +23,8 @@ Générateur dynamique de poules pour des compétitions sportives (judo, karaté
 2. Défini la taille maximale d'une poule.
 3. Clique sur **Générer les Poules**.
 4. Réorganise les combattants par glisser-déposer si besoin.
-5. _(Optionnel)_ Génère un fichier CSV de test pour faire des essais.
+5. Clique sur **Exporter en PDF** pour imprimer les fiches.
+6. _(Optionnel)_ Génère un fichier CSV de test pour faire des essais.
 
 ## 📄 Exemple de format CSV attendu
 
@@ -38,8 +40,9 @@ Durand,Marie,F,18,Verte,57
 - HTML5
 - CSS3
 - JavaScript (Vanilla)
+- [jsPDF](https://github.com/parallax/jsPDF) + autoTable
 
-Aucune dépendance externe, 100% **autonome et portable**.
+Aucune dépendance serveur, 100% **autonome et portable**.
 
 ## 📅 Installation
 
